@@ -1,0 +1,42 @@
+-- Databricks notebook source
+-- DBTITLE 1,Create insights_gold table with day of week and referral source analysis
+-- MAGIC %python
+-- MAGIC from pyspark.sql import functions as F
+-- MAGIC
+-- MAGIC # Read the cleaned users table
+-- MAGIC df = spark.table("dataengineering.video1.users_date_uidcleaned")
+-- MAGIC
+-- MAGIC # Extract day of week from signup_date and create insights
+-- MAGIC insights_df = df.withColumn("day_of_week", F.dayofweek("signup_date")) \
+-- MAGIC                 .withColumn("day_name", F.date_format("signup_date", "EEEE"))
+-- MAGIC
+-- MAGIC # Aggregate by day of week
+-- MAGIC day_insights = insights_df.groupBy("day_of_week", "day_name") \
+-- MAGIC     .agg(
+-- MAGIC         F.count("*").alias("total_signups")
+-- MAGIC     ) \
+-- MAGIC     .orderBy(F.desc("total_signups"))
+-- MAGIC
+-- MAGIC # Aggregate by referral source (ads clicked)
+-- MAGIC referral_insights = insights_df.groupBy("referral_source") \
+-- MAGIC     .agg(
+-- MAGIC         F.count("*").alias("total_clicks")
+-- MAGIC     ) \
+-- MAGIC     .orderBy(F.desc("total_clicks"))
+-- MAGIC
+-- MAGIC # Combine insights - cross join to create a comprehensive gold table
+-- MAGIC # Or create separate metrics in one table
+-- MAGIC insights_gold = insights_df.groupBy("day_of_week", "day_name", "referral_source") \
+-- MAGIC     .agg(
+-- MAGIC         F.count("*").alias("signup_count")
+-- MAGIC     ) \
+-- MAGIC     .orderBy("day_of_week", F.desc("signup_count"))
+-- MAGIC
+-- MAGIC # Write to gold table
+-- MAGIC insights_gold.write.mode("overwrite").saveAsTable("dataengineering.video1.insights_gold")
+-- MAGIC
+-- MAGIC print("✅ insights_gold table created successfully!")
+-- MAGIC print("\n📊 Best Days of the Week:")
+-- MAGIC day_insights.show()
+-- MAGIC print("\n📢 Most Popular Referral Sources:")
+-- MAGIC referral_insights.show()
